@@ -28,7 +28,7 @@ export const RouteReview = z.object({
   summary: z.string(),
   valid_body_json: z.string(),
   cases: z.array(z.object({
-    title: z.string(), method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]), path: z.string(), query: z.string(), body_json: z.string(),
+    title: z.string(), method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]), path: z.string(), param_values_json: z.string(), query: z.string(), body_json: z.string(),
     expect_status: z.number().int(), needs_record: z.boolean(), rationale: z.string(),
   })),
 });
@@ -58,6 +58,6 @@ export function routePrompt(r, helpers, maxCases) {
     "Tasks:",
     "1. summary: what does this endpoint do and what rules does it enforce?",
     "2. valid_body_json: a JSON object (as text) that this endpoint accepts as valid, or \"\" if it takes no body.",
-    `3. cases: up to ${maxCases} HTTP test cases that check the RULES (exact boundaries such as the longest accepted value and one character more, required vs optional fields, type checks, not-found, state changes). Use the route path with :params left in place; give body_json as JSON text ("" if none), query as "a=1&b=2" ("" if none), the exact expect_status the code's rules imply, needs_record=true if the case needs an existing record (the runner creates one and fills :id), and a one-line rationale. Do not assume data that may not exist. Skip cases that are only guesses.`,
+    `3. cases: up to ${maxCases} HTTP test cases that check the RULES (exact boundaries such as the longest accepted value and one character more, required vs optional fields, type checks, not-found, state changes). Use the route path with :params left in place; when a case depends on a specific path value (e.g. a malformed id), give param_values_json as JSON text like {"id":"abc"} (otherwise ""); give body_json as JSON text ("" if none), query as "a=1&b=2" ("" if none), the exact expect_status the code's rules imply, needs_record=true if the case needs an existing record (the runner creates one and fills :id), and a one-line rationale. Do not assume data that may not exist. Skip cases that are only guesses.`,
   ]);
 }

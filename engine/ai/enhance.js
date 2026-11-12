@@ -2,7 +2,7 @@
 import { unitInputs } from "../edgecases.js";
 import { recordUnit } from "../record.js";
 import { toJsLiteral } from "../serialize.js";
-import { slug } from "../generate/util.js";
+import { slug, bodyLiteral } from "../generate/util.js";
 import { safeExpr } from "./safe.js";
 import { redact } from "./redact.js";
 import { aiClient, askStructured, explainError, costOf, DEFAULT_MODEL, MODELS } from "./client.js";
@@ -75,6 +75,7 @@ export async function aiEnhance(model, base, opts = {}) {
       const picks = model.routes.filter((r) => r.code && !skipPath.test(r.path) && ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(r.method) && (r.validates || r.bodyFields.length || r.statuses.length > 1))
         .sort((a, b) => (b.validates ? 3 : 0) + b.bodyFields.length + b.statuses.length - ((a.validates ? 3 : 0) + a.bodyFields.length + a.statuses.length)).slice(0, opts.maxRoutes ?? 8);
       const byService = new Map();
+      const reviews = new Map();
       let n = 0;
       for (const r of picks) {
         log(`Reviewing ${r.method} ${r.path} … (${++n}/${picks.length})`);
@@ -86,12 +87,16 @@ export async function aiEnhance(model, base, opts = {}) {
           if (!ok) out.skipped.push({ layer: "ai", what: `${r.method} ${r.path}: "${short(c.title, 40)}"`, reason: "the case did not match the route or had an invalid body/query" });
           return ok;
         });
+        reviews.set(`${r.service}|${r.method} ${r.path}`, a.data);
         if (!cases.length) continue;
         out.routes++;
         const coll = r.path.replace(/\/:\w+\*?$/, "");
         const post = model.routes.find((x) => x.method === "POST" && x.path === coll && x.service === r.service);
         const del = model.routes.find((x) => x.method === "DELETE" && x.path === coll + "/:id" && x.service === r.service);
-        const item = { route: r, review: { ...a.data, cases }, createPath: post ? post.path : null, createBody: a.data.valid_body_json || "{}", deletePath: del ? del.path : null };
+        // a record is created through the collection's own POST endpoint, using ITS valid body (not this endpoint's)
+        const postReview = post && reviews.get(`${post.service}|POST ${post.path}`);
+        const createBody = (postReview && postReview.valid_body_json) || (post && post.bodyFields.length ? bodyLiteral(post.bodyFields) : "{}");
+        const item = { route: r, review: { ...a.data, cases }, createPath: post ? post.path : null, createBody, deletePath: del ? del.path : null };
         (byService.get(r.service || "") || byService.set(r.service || "", []).get(r.service || "")).push(item);
       }
       for (const [svc, items] of byService) {

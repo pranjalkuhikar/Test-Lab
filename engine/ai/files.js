@@ -38,11 +38,13 @@ export function integrationAiFile(service, items, fl) {
     const tests = [];
     for (const c of review.cases) {
       const hasParam = /:\w+/.test(c.path);
-      const url = "`" + c.path.replace(/:\w+\*?/g, "${id}") + (c.query ? "?" + c.query : "") + "`";
+      let given = {};
+      try { given = c.param_values_json ? JSON.parse(c.param_values_json) : {}; } catch {}
+      // a path value the AI named wins; otherwise the record the runner created; otherwise an id that should not exist
+      const url = "`" + c.path.replace(/:(\w+)\*?/g, (_, n) => (given[n] !== undefined ? encodeURIComponent(String(given[n])) : c.needs_record && createPath ? "${id}" : "987654321")) + (c.query ? "?" + c.query : "") + "`";
       const body = c.body_json ? `, { body: ${c.body_json} }` : "";
       let pre = "";
       if (c.needs_record && createPath) pre = `const made = await api(base, "POST", ${q(createPath)}, { body: ${createBody} });\n${f.ok("made.status < 300", "`could not create a record to test against: ${made.status} ${made.text.slice(0, 100)}`")}\nconst id = made.json?.id ?? made.json?.data?.id;\ncreated.push(id);\n`;
-      else if (hasParam) pre = `const id = "987654321"; // an id that should not exist\n`;
       tests.push(f.it(`[AI expectation] ${c.title}`, `// why: ${oneLine(c.rationale)}\n${pre}const res = await api(base, ${q(c.method)}, ${url}${body});\n${f.ok(`res.status === ${c.expect_status}`, "`expected " + c.expect_status + " but got ${res.status}: ${res.text.slice(0, 140)}`")}`, { skip: route.auth ? "needsToken" : undefined }));
       count++;
     }
