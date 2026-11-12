@@ -1,5 +1,6 @@
 // Playwright test files for a hosted website, built from what the crawl observed. Read-only: tests navigate and read, they never submit forms.
 import { SCHEMA_HELPER, infer } from "../generate/contract.js";
+import path from "node:path";
 import { header, q, slug } from "../generate/util.js";
 
 const H = (title, lines = []) => header(title, ["Generated from a read-only analysis of " + "the live site. Failing tests point at real problems (or at a test that needs adjusting).", ...lines]);
@@ -47,13 +48,13 @@ export default defineConfig({
 });
 `;
 
-export function siteFiles(site, an, rec) {
+export function siteFiles(site, an, rec, layers = null) {
   const pages = site.pages.filter((p) => !p.blocked && !p.error && p.status && p.status < 400);
   if (!pages.length) return { files: [], count: 0, skipped: [{ layer: "all", what: "pages", reason: "no page could be analysed" }] };
   const files = [], skipped = [];
-  const add = (path, layer, content, tests) => files.push({ path: `site-tests/${path}`, layer, content, tests, ...(tests ? {} : { support: true }) });
+  const add = (p, layer, content, tests) => files.push({ path: path.posix.normalize(`site-tests/${p}`), layer, content, tests, ...(tests ? {} : { support: true }) });
   const paths = pages.map((p) => new URL(p.url).pathname + new URL(p.url).search).slice(0, 12);
-  const limit = (id) => rec.mix.find((m) => m.id === id)?.percent > 0;
+  const limit = (id) => (layers ? layers.includes(id) : rec.mix.find((m) => m.id === id)?.percent > 0);
   let count = 0;
 
   // ---- smoke (+ mobile overflow)
@@ -188,7 +189,7 @@ export function siteFiles(site, an, rec) {
 
   // ---- forms (read-only: they are NOT submitted on a live site)
   const forms = pages.flatMap((p) => (p.forms || []).map((f) => ({ path: new URL(p.url).pathname, ...f })));
-  if (forms.length) {
+  if (forms.length && limit("e2e")) {
     add("forms.spec.mjs", "e2e", [H("Forms render and are usable", ["These tests do NOT submit forms: submitting on a live site can create real data or send real e-mail."]), 'import { test, expect } from "@playwright/test";', "", `const FORMS = ${JSON.stringify(forms.map((f) => ({ path: f.path, fields: f.fields.map((x) => ({ name: x.name, type: x.type })) })), null, 0)};`, "",
       "for (const [i, f] of FORMS.entries()) {",
       '  test("form " + (i + 1) + " on " + f.path + " is present and its fields are labelled", async ({ page }) => {',
@@ -199,7 +200,7 @@ export function siteFiles(site, an, rec) {
       "      const named = await el.evaluate((n) => !!(n.getAttribute(\"aria-label\") || n.getAttribute(\"aria-labelledby\") || n.labels?.length || n.placeholder));",
       '      expect.soft(named, field.name + " needs a label, aria-label or placeholder").toBe(true);',
       "    }", "  });", "}", ""].join("\n"), forms.length); count += forms.length;
-  } else skipped.push({ layer: "e2e", what: "forms", reason: "no forms were found on the crawled pages" });
+  } else if (limit("e2e")) skipped.push({ layer: "e2e", what: "forms", reason: "no forms were found on the crawled pages" });
 
   // ---- API contract (same-origin JSON the pages fetch)
   const apis = site.apis.filter((a) => a.sameOrigin && a.method === "GET" && a.sample !== undefined);
