@@ -90,6 +90,7 @@ export async function crawlSite(startUrl, opts = {}) {
       const url = queue.shift();
       onProgress(`Visiting ${url.replace(origin, "") || "/"}  (${site.pages.length + 1}/${maxPages})`);
       const page = await context.newPage();
+      const pending = [];
       const rec = { url, path: new URL(url).pathname + new URL(url).search, status: null, errors: [], consoleErrors: [], failedRequests: [], requests: [] };
       page.on("pageerror", (e) => rec.errors.push(String(e.message).slice(0, 160)));
       page.on("console", (m) => { if (m.type() === "error" && !/favicon/i.test(m.text())) rec.consoleErrors.push(m.text().slice(0, 160)); });
@@ -99,7 +100,13 @@ export async function crawlSite(startUrl, opts = {}) {
         let o; try { o = new URL(u).origin; } catch { return; }
         if (o !== origin) site.thirdParty[new URL(u).host] = (site.thirdParty[new URL(u).host] || 0) + 1;
         if (r.status() >= 400 && o === origin) rec.failedRequests.push({ url: u.slice(0, 140), status: r.status() });
-        if ((type === "fetch" || type === "xhr")) rec.requests.push({ url: u.split("#")[0], method: req.method(), status: r.status(), type: r.headers()["content-type"] || "" });
+        // only genuine JSON data calls count as "the backend this page talks to" (not Next.js prefetches or analytics pings)
+        const ct = r.headers()["content-type"] || "";
+        if ((type === "fetch" || type === "xhr") && /json/i.test(ct) && !/[?&]_rsc=/.test(u)) {
+          const call = { url: u.split("#")[0], method: req.method(), status: r.status(), type: ct };
+          rec.requests.push(call);
+          if (req.method() === "GET" && o === origin) pending.push(r.text().then((t) => { if (t.length < 60000) call.sample = JSON.parse(t); }).catch(() => {}));
+        }
       });
       try {
         const resp = await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 });
@@ -124,6 +131,7 @@ export async function crawlSite(startUrl, opts = {}) {
           }
         }
       } catch (e) { rec.error = String(e.message).split("\n")[0].slice(0, 140); }
+      await Promise.allSettled(pending);
       rec.links = (rec.links || []).slice(0, 150);
       site.pages.push(rec);
       await page.close();
