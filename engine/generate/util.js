@@ -1,5 +1,11 @@
 // Shared bits for the generators: runner flavours (node:test or Vitest), naming, file headers, sample data.
+import crypto from "node:crypto";
 export const q = (s) => JSON.stringify(String(s));
+// A long string result is pinned by its length and SHA-256 digest instead of being pasted into the test
+export const digestOf = (text) => crypto.createHash("sha256").update(String(text)).digest("hex");
+export function longStringChecks(f, text) {
+  return `${f.eq("typeof r.value", '"string"')}\n${f.eq("r.value.length", String(String(text).length))}\n${f.eq('createHash("sha256").update(r.value).digest("hex")', q(digestOf(text)))} // long text: pinned by length + SHA-256 (see the comment above for the input)`;
+}
 export const slug = (s) => String(s).replace(/\.[a-z]+$/i, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "root";
 export const envName = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 

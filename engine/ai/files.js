@@ -1,6 +1,6 @@
 // Turns verified AI results into test files and a findings report.
 import { toJsLiteral } from "../serialize.js";
-import { flavor, header, q, slug, bodyLiteral } from "../generate/util.js";
+import { flavor, header, q, slug, longStringChecks } from "../generate/util.js";
 
 const oneLine = (s) => String(s).replace(/\s+/g, " ").trim();
 
@@ -8,7 +8,7 @@ export function unitAiFile(file, items, fl) {
   const f = flavor(fl);
   const depth = ("unit/" + slug(file) + ".ai.test.mjs").split("/").length - 1;
   const rel = "../".repeat(depth + 1) + file;
-  const out = [header(`AI-assisted unit tests for ${file}`, ["[AI case]    extra inputs proposed by the AI; the expected values were RECORDED from the real code (characterization).", "[AI finding] the AI believes the code is wrong here. These assert the EXPECTED behaviour, so they FAIL until the bug is fixed (or the finding is dismissed)."]), f.imports, "",
+  const out = [header(`AI-assisted unit tests for ${file}`, ["[AI case]    extra inputs proposed by the AI; the expected values were RECORDED from the real code (characterization).", "[AI finding] the AI believes the code is wrong here. These assert the EXPECTED behaviour, so they FAIL until the bug is fixed (or the finding is dismissed)."]), f.imports, 'import { createHash } from "node:crypto";', "",
     `const mod = await import(new URL(${q(rel)}, import.meta.url));`, `const pick = (name) => mod[name] ?? mod.default?.[name] ?? (name === "default" ? mod.default : undefined);`,
     `async function run(fn, ...args) { try { return { ok: true, value: await fn(...args) }; } catch (error) { return { ok: false, error }; } }`, ""];
   let count = 0;
@@ -16,7 +16,7 @@ export function unitAiFile(file, items, fl) {
     const body = [];
     for (const e of extras) {
       const lit = toJsLiteral(e.result.value);
-      if (e.result.kind === "return") { if (lit.length > 500) continue; body.push(f.it(`[AI case] ${e.label}`, `// why: ${oneLine(e.why)}\nconst r = await run(fn, ...(${e.argsExpr}));\n${f.eq("r.ok", "true")}\n${f.deep("r.value", lit)}`)); count++; }
+      if (e.result.kind === "return") { if (lit.length > 500 && typeof e.result.value !== "string") continue; body.push(f.it(`[AI case] ${e.label}`, `// why: ${oneLine(e.why)}\nconst r = await run(fn, ...(${e.argsExpr}));\n${f.eq("r.ok", "true")}\n${lit.length > 500 ? longStringChecks(f, e.result.value) : f.deep("r.value", lit)}`)); count++; }
       else if (e.result.kind === "throw") { body.push(f.it(`[AI case] ${e.label}`, `// why: ${oneLine(e.why)}\nconst r = await run(fn, ...(${e.argsExpr}));\n${f.eq("r.ok", "false")}\n${f.eq("r.error.name", q(e.result.name))}\n${f.eq("r.error.message", q(e.result.message.slice(0, 200)))}`)); count++; }
     }
     for (const x of findings) {
