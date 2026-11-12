@@ -1,11 +1,10 @@
 // Polite, read-only website crawler. A real (local) browser renders each page like a visitor would, and we record what we see.
 // It never submits forms, never logs in, stays on the same origin, respects robots.txt, and visits one page at a time.
 import fs from "node:fs";
-import { createRequire } from "node:module";
+import path from "node:path";
 import { chromium } from "playwright-core";
 import { findBrowser } from "../verify.js";
 
-const require = createRequire(import.meta.url);
 const SKIP_EXT = /\.(pdf|png|jpe?g|gif|svg|webp|ico|zip|gz|mp4|mp3|webm|woff2?|ttf|css|js|json|xml|txt|docx?|xlsx?)(\?|$)/i;
 const SKIP_PATH = /(logout|signout|sign-out|log-out|delete|remove|unsubscribe)/i;
 
@@ -84,7 +83,8 @@ export async function crawlSite(startUrl, opts = {}) {
   const browser = await chromium.launch({ executablePath: exe, headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: false });
-    const axeSource = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
+    // (not require.resolve: the bundler rewrites it into a virtual path)
+    const axeSource = fs.readFileSync(path.join(process.cwd(), "node_modules", "axe-core", "axe.min.js"), "utf8");
     const queue = [start], seen = new Set([start]);
     while (queue.length && site.pages.length < maxPages && Date.now() - t0 < deadlineMs) {
       const url = queue.shift();
