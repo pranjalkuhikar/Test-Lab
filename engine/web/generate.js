@@ -38,7 +38,7 @@ export default defineConfig({
   testMatch: /.*\\.spec\\.mjs/,
   timeout: 45_000,
   retries: 1,
-  workers: 2,
+  workers: 1, // one page at a time: gentle on a live site
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.02 } },
   use: { baseURL: process.env.BASE_URL || ${q(site.origin)}, trace: "retain-on-failure", launchOptions },
   projects: [
