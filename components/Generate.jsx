@@ -50,7 +50,7 @@ export default function Generate({ scan, disc, onError }) {
   }, [aiOn, aiModel, scan.id]);
 
   const chosen = Object.keys(layers).filter((k) => layers[k]);
-  const needsApp = chosen.some((k) => ["integration", "contract", "pact"].includes(k));
+  const needsApp = chosen.some((k) => ["integration", "contract", "pact", "e2e"].includes(k));
 
   async function generate() {
     setBusy("generate"); setVer(null); setSaved(null); onError(null);
@@ -175,7 +175,7 @@ export default function Generate({ scan, disc, onError }) {
 
           <h2 style={{ marginTop: 28 }}>Verify</h2>
           <p className="muted">Run what was generated and see what passes. Unit tests run in a restricted sandbox (no file writes, no subprocesses). API and contract tests send real requests.</p>
-          {needsApp && <label className="chk warnbox"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /><span>I understand API tests send real requests to <code>{baseUrl || "the app"}</code> and will create, change and delete data there. It is a development environment.</span></label>}
+          {needsApp && <label className="chk warnbox"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /><span>I understand API and browser tests send real requests to <code>{baseUrl || "the app"}</code> and will create, change and delete data there. It is a development environment.</span></label>}
           <button className="btn go" onClick={run} disabled={busy || (gen.flavor === "vitest")}>{busy === "verify" ? "Running tests…" : "▶ Run tests"}</button>
           {gen.flavor === "vitest" && <span className="muted"> &nbsp;Vitest files aren’t run here. Use <code>npx vitest run tests-generated</code> in your project.</span>}
 
