@@ -10,7 +10,7 @@ How your output is used:
 Writing test inputs (args_expr, value_expr):
 - Each is ONE JavaScript expression, evaluated in an empty sandbox. args_expr must evaluate to an ARRAY of the function's arguments, e.g. [5, "x"] or [new Uint32Array(520).fill(2), 95].
 - Allowed: literals, arrays, objects, template strings, arithmetic/logic, new Map/Set/Date/Uint32Array/Float64Array/..., Array.from, Array(n).fill(x), "x".repeat(n), Math.*, JSON.*, simple arrow functions with expression bodies.
-- Forbidden: statements, function bodies with braces, require/import/process/fetch/eval, any identifier not built into JavaScript. Keep each expression under 600 characters.
+- Forbidden: statements, function bodies with braces, require/import/process/fetch/eval, any identifier not built into JavaScript. Keep each expression under 2500 characters (realistic nested objects are welcome, but stay compact).
 - Build REALISTIC structured inputs (nested objects, arrays of records, typed arrays of counts) that exercise the code's branches. Generic values are already covered; your value is domain knowledge.
 
 Findings: severity "bug" = wrong behaviour you are confident about; "suspicious" = likely unintended. expect.kind "returns" with value_expr (the value a correct implementation returns), or "throws" with error_name. Use "" for fields that do not apply.`;

@@ -17,7 +17,8 @@ export function parseJunit(xml) {
     const inner = m[2] || "";
     const fail = inner.match(/<failure[^>]*message="([^"]*)"/);
     const failBody = inner.match(/<failure[^>]*>([\s\S]*?)<\/failure>/);
-    tests.push({ name: unesc(m[1]), status: fail || /<failure/.test(inner) ? "fail" : /<skipped/.test(inner) ? "skip" : "pass", message: fail ? unesc(fail[1]).slice(0, 400) : failBody ? unesc(failBody[1]).trim().slice(0, 400) : undefined });
+    const name = unesc(m[1]); const failed = !!fail || /<failure/.test(inner);
+    tests.push({ name, status: failed ? (/^\[AI (finding|expectation)\]/.test(name) ? "finding" : "fail") : /<skipped/.test(inner) ? "skip" : "pass", message: fail ? unesc(fail[1]).slice(0, 400) : failBody ? unesc(failBody[1]).trim().slice(0, 400) : undefined });
   }
   return tests;
 }
@@ -52,12 +53,12 @@ export async function verify({ files, runDir, projectRoot, baseUrl, token, expec
   const results = [];
   if (flavor === "vitest") return { results, note: "The Vitest flavour is not run by TestLab. Run it in your project with `npx vitest run tests-generated`." };
   const root = materialize(files, runDir, projectRoot);
-  const wanted = files.filter((f) => !f.support && !f.data && f.tests > 0 && layers.includes(f.layer) && f.layer !== "e2e");
+  const wanted = files.filter((f) => !f.support && !f.data && f.tests > 0 && (layers.includes(f.layer) || f.layer === "ai") && f.layer !== "e2e");
   const baseEnv = { ...process.env, BASE_URL: baseUrl || "", TEST_TOKEN: token || "", ...(expectAuth !== undefined ? { EXPECT_AUTH: expectAuth ? "1" : "0" } : {}), NODE_ENV: "test" };
   for (const f of wanted) {
     const abs = path.join(root, f.path);
     const entry = { path: f.path, layer: f.layer, tests: [], status: "pass", ms: 0 };
-    const http = f.layer !== "unit";
+    const http = f.layer !== "unit" && !(f.layer === "ai" && f.path.startsWith("unit/"));
     if (http && !(confirmRequests && baseUrl)) { entry.status = "not-run"; entry.note = !baseUrl ? "needs the app's URL" : "needs your confirmation: these tests send real requests"; results.push(entry); onFile?.(entry); continue; }
     // Real paths + a relative entry file: on macOS /tmp is a symlink, and resolving it would need read access to /tmp itself.
     const realRun = fs.realpathSync(runDir), realRoot = fs.realpathSync(projectRoot || runDir);
@@ -74,11 +75,12 @@ export async function verify({ files, runDir, projectRoot, baseUrl, token, expec
       entry.note = (/ERR_ACCESS_DENIED|Permission/.test(r.err) ? "blocked by the sandbox: the module tried to do something not allowed (write files, run programs). " : "") + msg.slice(0, 220);
     } else {
       const failed = tests.filter((t) => t.status === "fail").length;
-      entry.status = failed ? "fail" : tests.every((t) => t.status === "skip") ? "skipped" : "pass";
+      const found = tests.filter((t) => t.status === "finding").length;
+      entry.status = failed ? "fail" : found ? "findings" : tests.every((t) => t.status === "skip") ? "skipped" : "pass";
       if (r.killed) entry.note = "timed out";
     }
     results.push(entry); onFile?.(entry);
   }
   const all = results.flatMap((r) => r.tests);
-  return { results, totals: { passed: all.filter((t) => t.status === "pass").length, failed: all.filter((t) => t.status === "fail").length, skipped: all.filter((t) => t.status === "skip").length, filesNotRun: results.filter((r) => r.status === "not-run").length, filesErrored: results.filter((r) => r.status === "error").length } };
+  return { results, totals: { passed: all.filter((t) => t.status === "pass").length, failed: all.filter((t) => t.status === "fail").length, findings: all.filter((t) => t.status === "finding").length, skipped: all.filter((t) => t.status === "skip").length, filesNotRun: results.filter((r) => r.status === "not-run").length, filesErrored: results.filter((r) => r.status === "error").length } };
 }

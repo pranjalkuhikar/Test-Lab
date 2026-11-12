@@ -11,7 +11,7 @@ const NODES = new Set(["File", "Program", "ExpressionStatement", "StringLiteral"
   "BinaryExpression", "LogicalExpression", "UnaryExpression", "ConditionalExpression", "ParenthesizedExpression", "SequenceExpression"]);
 const BAD_PROPS = new Set(["constructor", "__proto__", "prototype", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "caller", "callee", "arguments"]);
 
-export function safeExpr(expr, { maxLen = 700 } = {}) {
+export function safeExpr(expr, { maxLen = 3000 } = {}) {
   if (typeof expr !== "string" || !expr.trim()) return { ok: false, reason: "empty" };
   if (expr.length > maxLen) return { ok: false, reason: "too long" };
   let ast;
