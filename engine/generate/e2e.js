@@ -9,8 +9,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: ".",
   testMatch: /.*\\.spec\\.mjs/,
-  timeout: 30_000,
-  retries: 1,
+  timeout: 20_000,
+  retries: 0,
   use: {
     baseURL: process.env.BASE_URL || "__BASE_URL__", trace: "retain-on-failure", screenshot: "only-on-failure",
     // use an installed browser instead of downloading one: PLAYWRIGHT_EXECUTABLE=/path/to/chrome-or-brave
@@ -40,7 +40,8 @@ export function e2eFiles(model) {
         const loc = i.name ? `page.locator('[name="${i.name}"]')` : `page.getByPlaceholder(${q(i.placeholder)})`;
         return val === null ? `    await ${loc}.check();` : `    await ${loc}.fill(${q(val)});`;
       }).join("\n")}\n${button ? `    await page.getByRole("button", { name: new RegExp(${q(safeRe(button))}, "i") }).first().click();\n` : `    await page.keyboard.press("Enter");\n`}    await page.waitForLoadState("networkidle");\n    expect(problems, problems.join("\\n")).toEqual([]);\n  });`);
-      out.push(`  test("empty form submission does not crash the page", async ({ page }) => {\n    const problems = watch(page);\n    await page.goto(${q(p.path)});\n${button ? `    await page.getByRole("button", { name: new RegExp(${q(safeRe(button))}, "i") }).first().click();\n` : `    await page.keyboard.press("Enter");\n`}    await page.waitForTimeout(500);\n    await expect(page.locator("body")).toBeVisible();\n    expect(problems, problems.join("\\n")).toEqual([]);\n  });`);
+      // Many forms disable the submit button until the fields are valid: that IS the correct behaviour, so it counts as a pass.
+      out.push(`  test("empty form submission is blocked or handled without errors", async ({ page }) => {\n    const problems = watch(page);\n    await page.goto(${q(p.path)});\n${button ? `    const submit = page.getByRole("button", { name: new RegExp(${q(safeRe(button))}, "i") }).first();\n    if (await submit.isDisabled()) {\n      await expect(submit).toBeDisabled(); // the app prevents empty submission\n    } else {\n      await submit.click({ timeout: 5000 });\n      await page.waitForTimeout(500);\n    }\n` : `    await page.keyboard.press("Enter");\n    await page.waitForTimeout(500);\n`}    await expect(page.locator("body")).toBeVisible();\n    expect(problems, problems.join("\\n")).toEqual([]);\n  });`);
       count += 2;
     }
     out.push("});", "");
