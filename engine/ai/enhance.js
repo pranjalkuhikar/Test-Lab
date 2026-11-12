@@ -91,7 +91,6 @@ export async function aiEnhance(model, base, opts = {}) {
         const coll = r.path.replace(/\/:\w+\*?$/, "");
         const post = model.routes.find((x) => x.method === "POST" && x.path === coll && x.service === r.service);
         const del = model.routes.find((x) => x.method === "DELETE" && x.path === coll + "/:id" && x.service === r.service);
-        const createBody = (r.method === "POST" && r.path === coll ? a.data.valid_body_json : "") || (post && post.bodyFields.length ? null : null);
         const item = { route: r, review: { ...a.data, cases }, createPath: post ? post.path : null, createBody: a.data.valid_body_json || "{}", deletePath: del ? del.path : null };
         (byService.get(r.service || "") || byService.set(r.service || "", []).get(r.service || "")).push(item);
       }
