@@ -29,7 +29,7 @@ Open it, click one of your project folders (or paste a path), and press **Scan**
 | **What to test first** | Functions and endpoints ranked by risk (complexity, writes data, auth-protected, already tested?) |
 | **Edge cases** | Per endpoint and per function: bad IDs, missing/blank/oversized fields, malformed JSON, mass assignment, double submit, auth, pagination, XSS/SQL payloads… Items marked `auto` become test code |
 | **Generate** | Real files in `tests-generated/`, runnable with `node --test` (or Vitest). Download as ZIP or write into the project |
-| **Verify** | Runs what was generated. Unit tests run in a **restricted sandbox**; API/contract tests run against your running app after you confirm |
+| **Verify** | Runs what was generated. Unit tests run in a **restricted sandbox**; API, contract and browser (E2E) tests run against your running app after you confirm |
 
 ### The five test layers
 
@@ -39,7 +39,7 @@ Open it, click one of your project folders (or paste a path), and press **Scan**
 | **Integration (API)** | Real HTTP requests: create → read → update → delete lifecycles, bad/missing IDs, malformed JSON, per-field abuse, mass assignment, double submit, XSS payloads, stack-trace leaks, auth (401, tampered tokens) |
 | **Contract (schema)** | Learns each `GET` response's real shape by probing your running app (read-only), then asserts it stays that shape |
 | **Pact** | Writes **Pact v3 JSON files** (type matching rules) per consumer/provider pair, plus a verifier that replays them against the provider |
-| **E2E** | **Playwright** specs: every page loads without errors; forms accept input and submit. (Generated, not run by TestLab; needs `@playwright/test`) |
+| **E2E** | **Playwright** specs: every page loads without errors; forms accept input and submit, or are correctly blocked (a disabled submit button counts as a pass). TestLab runs them in a **locally installed Chrome, Brave, Chromium or Edge** (or `PLAYWRIGHT_EXECUTABLE`), so nothing is downloaded |
 
 ## AI review (optional)
 Tick **✨ AI review** in the Generate panel and Claude (default `claude-opus-5-5`; Sonnet 5.5 and Haiku 5.5 are selectable) reviews the ~10 riskiest functions and ~8 endpoints. It adds what rules can't:
@@ -96,7 +96,7 @@ It is a transparent heuristic, **not a rule**. The page shows the reasons behind
 - Functions that mix logic with database/network calls aren't unit-tested automatically (they'd need mocks). Move the logic into small pure functions, or rely on the API tests.
 - Body fields for endpoints are inferred from code (including validators in other files, one level deep). Unusual patterns may be missed; edit the generated test.
 - Contract and Pact tests need the app **running** (to learn real shapes) and, for protected routes, a bearer token.
-- E2E tests are generated but not executed here.
+- E2E tests only cover "pages load cleanly" and "forms accept input". They do not know your business flows. They submit forms, so run them against a development database.
 - Static analysis is heuristic: routes registered dynamically (loops, plugins) may be missed.
 - JavaScript/TypeScript only; TypeScript source is scanned for routes, but its functions are not unit-tested (they need a compiler).
 - No LLM is used. Everything is deterministic analysis, so the same project gives the same output. An AI layer could write richer assertions and is a natural next step.
