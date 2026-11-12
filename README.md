@@ -41,6 +41,38 @@ Open it, click one of your project folders (or paste a path), and press **Scan**
 | **Pact** | Writes **Pact v3 JSON files** (type matching rules) per consumer/provider pair, plus a verifier that replays them against the provider |
 | **E2E** | **Playwright** specs: every page loads without errors; forms accept input and submit. (Generated, not run by TestLab; needs `@playwright/test`) |
 
+## AI review (optional)
+Tick **✨ AI review** in the Generate panel and Claude (default `claude-opus-5-5`; Sonnet 5.5 and Haiku 5.5 are selectable) reviews the ~10 riskiest functions and ~8 endpoints. It adds what rules can't:
+
+- **Realistic structured inputs** (nested objects, arrays of records, typed arrays of counts) that reach branches generic edge values never do
+- **Suspected bugs**, each with a concrete input and what a correct implementation would return
+- **Endpoint rules** from reading the handler and its validators (exact length limits, required vs optional fields, expected status codes)
+
+**The AI proposes; TestLab disposes.** Nothing the model says is trusted:
+
+| Step | What happens |
+|---|---|
+| Input check | Every input the AI writes is **code**. It must pass a strict whitelist (literals, arrays/objects, typed arrays, a few builtins). `process`, `require`, `fetch`, `eval`, `constructor` tricks and loops are rejected before anything runs |
+| Execution | Accepted inputs run in the same restricted sandbox as every other unit test; the **real** result is recorded |
+| Cross-check | Each "bug" claim is compared with that real result. If the code already does what the AI said it should, the claim is **discarded**. Only real discrepancies survive |
+| API cases | AI predictions for endpoints become tests that run against your app; a wrong prediction shows up as a finding, not as silent breakage |
+
+Findings are **leads for a human**: the sandbox proves the code differs from the AI's expectation, not that the AI is right about what is correct. They appear in the UI, in `AI-FINDINGS.md`, and as `[AI finding]` / `[AI expectation]` tests, reported separately from real failures.
+
+**Privacy and cost:** AI review is off by default and needs an explicit consent tick, because the source of the reviewed functions/endpoints (and the validators they call) is sent to the Anthropic API. Strings that look like secrets (API keys, tokens, private keys, passwords) are redacted first. The key you paste is used for that request only and is never stored or logged; alternatively set `ANTHROPIC_API_KEY` where TestLab runs. A price estimate is shown before you generate and the real token usage after.
+
+### Does it actually catch bugs? (mutation testing)
+Method: generate tests from the original code, then break the code one small way at a time (`>` → `>=`, `&&` → `||`, `3600` → `3601`, …) and count how many broken versions the tests notice. On the load-tester's own helper functions (120 mutants):
+
+| Test inputs | Mutants caught |
+|---|---|
+| Generic edge values only | 43% |
+| + boundary values taken from the function's own constants and comparisons | 77.5% |
+| + long text outputs pinned by length and SHA-256 | 79% |
+| + realistic structured inputs *(measured with a scripted stand-in for the AI)* | 89% |
+
+The last row measures the mechanism (richer inputs kill more mutants), not a specific model's quality. Survivors are mostly functions that need domain-specific data and a few equivalent mutants that cannot change behaviour.
+
 ## How the percentages are calculated
 Each layer scores the evidence the scan found, then scores are scaled to 100%:
 

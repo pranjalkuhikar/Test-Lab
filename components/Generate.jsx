@@ -113,7 +113,7 @@ export default function Generate({ scan, disc, onError }) {
                 <input type="password" value={aiKey} onChange={(e) => setAiKey(e.target.value)} placeholder={aiMeta?.serverKey ? "using ANTHROPIC_API_KEY from the server" : "sk-ant-…"} autoComplete="off" spellCheck={false} /></div>
             </div>
             <p className="note">Reviews the ~10 riskiest functions and ~8 endpoints. {aiEst ? <>Estimated cost: <b>≈ ${aiEst.cost.toFixed(2)}</b> for {aiEst.calls} requests <em>({aiEst.note})</em>.</> : null}</p>
-            <label className="chk warnbox"><input type="checkbox" checked={aiConsent} onChange={(e) => setAiConsent(e.target.checked)} /> I agree that the <b>source code of those functions and endpoints</b> (and the validators they call) is sent to the Anthropic API. Strings that look like secrets are redacted first. The key is used for this request only and is never stored.</label>
+            <label className="chk warnbox"><input type="checkbox" checked={aiConsent} onChange={(e) => setAiConsent(e.target.checked)} /><span>I agree that the <b>source code of those functions and endpoints</b> (and the validators they call) is sent to the Anthropic API. Strings that look like secrets are redacted first. The key is used for this request only and is never stored.</span></label>
           </div>
         )}
       </div>
@@ -175,7 +175,7 @@ export default function Generate({ scan, disc, onError }) {
 
           <h2 style={{ marginTop: 28 }}>Verify</h2>
           <p className="muted">Run what was generated and see what passes. Unit tests run in a restricted sandbox (no file writes, no subprocesses). API and contract tests send real requests.</p>
-          {needsApp && <label className="chk warnbox"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I understand API tests send real requests to <code>{baseUrl || "the app"}</code> and will create, change and delete data there. It is a development environment.</label>}
+          {needsApp && <label className="chk warnbox"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /><span>I understand API tests send real requests to <code>{baseUrl || "the app"}</code> and will create, change and delete data there. It is a development environment.</span></label>}
           <button className="btn go" onClick={run} disabled={busy || (gen.flavor === "vitest")}>{busy === "verify" ? "Running tests…" : "▶ Run tests"}</button>
           {gen.flavor === "vitest" && <span className="muted"> &nbsp;Vitest files aren’t run here. Use <code>npx vitest run tests-generated</code> in your project.</span>}
 
