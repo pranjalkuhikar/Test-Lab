@@ -11,7 +11,11 @@ export default defineConfig({
   testMatch: /.*\\.spec\\.mjs/,
   timeout: 30_000,
   retries: 1,
-  use: { baseURL: process.env.BASE_URL || "__BASE_URL__", trace: "retain-on-failure", screenshot: "only-on-failure" },
+  use: {
+    baseURL: process.env.BASE_URL || "__BASE_URL__", trace: "retain-on-failure", screenshot: "only-on-failure",
+    // use an installed browser instead of downloading one: PLAYWRIGHT_EXECUTABLE=/path/to/chrome-or-brave
+    launchOptions: process.env.PLAYWRIGHT_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE } : {},
+  },
 });
 `;
 
