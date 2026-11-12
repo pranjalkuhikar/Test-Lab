@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useState } from "react";
 
 const LAYER_LABEL = { unit: "Unit", integration: "Integration", contract: "Contract", pact: "Pact", e2e: "E2E", ai: "AI-assisted", support: "Support" };
-const api = async (url, body) => {
+export const api = async (url, body) => {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
   return j;
 };
 
-function Code({ file }) {
+export function Code({ file }) {
   const [copied, setCopied] = useState(false);
   if (!file) return <div className="codebox empty">Pick a file to see its code</div>;
   const lines = file.content.split("\n");

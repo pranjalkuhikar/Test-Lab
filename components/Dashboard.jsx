@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Summary, Mix, Risks, EdgeCases } from "./Analysis";
 import Generate from "./Generate";
+import Website from "./Website";
 
 const getJson = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`); return j; };
 
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [disc, setDisc] = useState(null);
   const [recent, setRecent] = useState([]);
+  const [mode, setMode] = useState("project");
 
   const loadRecent = useCallback(() => getJson("/api/scan").then((d) => setRecent(d.scans)).catch(() => {}), []);
   useEffect(() => { getJson("/api/discover").then(setDisc).catch(() => {}); loadRecent(); }, [loadRecent]);
@@ -32,6 +34,11 @@ export default function Dashboard() {
         {scan && <nav><a href="#mix">Mix</a><a href="#risks">Risks</a><a href="#edge">Edge cases</a><a href="#generate">Generate</a></nav>}
       </header>
 
+      <div className="modetabs">
+        <button className={mode === "project" ? "on" : ""} onClick={() => setMode("project")}>📁 Project folder <small>source code</small></button>
+        <button className={mode === "website" ? "on" : ""} onClick={() => setMode("website")}>🌐 Live website <small>just a URL</small></button>
+      </div>
+      {mode === "website" ? <Website /> : (<>
       <section className="card scanbar">
         <h2>{scan ? "Project" : "Point TestLab at a JavaScript project"}</h2>
         <div className="row">
@@ -70,6 +77,7 @@ export default function Dashboard() {
           <Generate key={scan.id} scan={scan} disc={disc} onError={setError} />
         </div>
       )}
+      </>)}
       <footer className="foot">TestLab generates a strong first draft. Review the tests before trusting them: they can only know what your code <i>does</i>, not what it <i>should</i> do.</footer>
     </div>
   );
