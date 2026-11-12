@@ -41,7 +41,7 @@ export function materialize(files, runDir, projectRoot) {
   for (const f of files) {
     let content = f.content;
     // the verification copy lives outside the project, so point its imports at the project by absolute path
-    if (f.layer === "unit" && projectRoot) content = content.replace(/new URL\("(?:\.\.\/)+([^"]+)", import\.meta\.url\)/, (_, p) => `new URL(${JSON.stringify(pathToFileURL(path.join(projectRoot, p)).href)})`);
+    if ((f.layer === "unit" || (f.layer === "ai" && f.path.startsWith("unit/"))) && projectRoot) content = content.replace(/new URL\("(?:\.\.\/)+([^"]+)", import\.meta\.url\)/, (_, p) => `new URL(${JSON.stringify(pathToFileURL(path.join(projectRoot, p)).href)})`);
     const abs = path.join(root, f.path);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content);
