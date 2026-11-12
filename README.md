@@ -41,6 +41,21 @@ Open it, click one of your project folders (or paste a path), and press **Scan**
 | **Pact** | Writes **Pact v3 JSON files** (type matching rules) per consumer/provider pair, plus a verifier that replays them against the provider |
 | **E2E** | **Playwright** specs: every page loads without errors; forms accept input and submit, or are correctly blocked (a disabled submit button counts as a pass). TestLab runs them in a **locally installed Chrome, Brave, Chromium or Edge** (or `PLAYWRIGHT_EXECUTABLE`), so nothing is downloaded |
 
+## Live websites (just a URL)
+Switch to the **🌐 Live website** tab, enter a URL (for example your hosted portfolio), confirm you own it, and press **Analyze**. No source code is needed.
+
+| Step | What happens |
+|---|---|
+| **Visit** | A real local browser (Chrome/Brave/Chromium/Edge) opens up to 30 pages, **one at a time with pauses**, and records titles, headings, forms, links, images, scripts, third-party hosts, console errors, timings (LCP, CLS, load, size), the JSON API calls the pages make, response headers, cookie flags, `robots.txt`, `sitemap.xml`, the 404 behaviour and the http→https redirect. Accessibility is measured with **axe-core** inside each rendered page |
+| **Recommend** | A mix tailored to a website: **End-to-end/smoke · Accessibility · Performance · Visual/responsive · SEO · Security headers (passive) · Links · API contract**, each with the evidence behind it. A portfolio comes out smoke + accessibility + SEO + links heavy; a web app gets more end-to-end and API checks |
+| **Problems now** | A severity-ranked list you can act on today (low contrast, missing alt text, missing security headers, broken links, slow pages…), each with how to fix it |
+| **Generate** | Playwright specs: `smoke` (desktop + mobile), `links`, `a11y`, `seo`, `security-headers`, `performance` (1.5× regression budgets plus Google's "good" thresholds), `visual` (desktop + mobile snapshots), `forms` (never submitted) and `api-contract` (shapes learned from the real JSON responses). Download as a ZIP |
+| **Run** | A real browser runs them against the live site (visual baselines are created first). Failing checks are real problems on the site, or a check that needs adjusting |
+
+**Safety:** you must tick that you own the site or have permission. It only **reads**: it respects `robots.txt` (and stops if it disallows the start page), stays on the same domain, never submits forms or logs in, does not try to get around bot protection (a blocked page is reported as blocked), and refuses link-local/metadata addresses. Running the generated tests needs a second confirmation. Only test sites you own.
+
+**Limits:** it sees what a visitor sees. Logged-in areas, admin screens and server-side logic are not covered, and results reflect the connection and machine it ran on. Automatic accessibility scans catch only part of real problems; a keyboard walkthrough is still worth doing.
+
 ## AI review (optional)
 Tick **✨ AI review** in the Generate panel and Claude (default `claude-opus-5-5`; Sonnet 5.5 and Haiku 5.5 are selectable) reviews the ~10 riskiest functions and ~8 endpoints. It adds what rules can't:
 

@@ -60,7 +60,10 @@ export async function analyzeSite(site) {
   if (!site.checks.https) add("high", "security", "Site is served over plain http", "Traffic can be read and altered in transit.", "Serve the site over HTTPS.");
 
   // ---------- reliability
-  for (const p of pages) if (p.consoleErrors?.length || p.errors?.length) add("medium", "reliability", `JavaScript errors on ${p.path}`, [...p.errors, ...p.consoleErrors].slice(0, 3).join(" · "), "Open the browser console on this page and fix the errors.", [p.url]);
+  for (const p of pages) if (p.consoleErrors?.length || p.errors?.length) {
+    const net = !p.errors?.length && p.consoleErrors.every((e) => /Failed to load resource|net::ERR/i.test(e)); // network hiccups, not code errors
+    add(net ? "low" : "medium", "reliability", net ? `Some resources failed to load on ${p.path}` : `JavaScript errors on ${p.path}`, [...p.errors, ...p.consoleErrors].slice(0, 3).join(" · "), net ? "Usually a slow or blocked third-party request. Re-check; if it repeats, fix or remove the reference." : "Open the browser console on this page and fix the errors.", [p.url]);
+  }
   const failedReq = pages.flatMap((p) => (p.failedRequests || []).filter((f) => f.status).map((f) => ({ ...f, page: p.url })));
   if (failedReq.length) add("medium", "reliability", "Resources that fail to load", `${failedReq.length} request${failedReq.length === 1 ? "" : "s"} returned errors, e.g. ${failedReq[0].url.slice(0, 80)} (${failedReq[0].status})`, "Fix or remove the broken references.", failedReq.map((f) => f.page));
   if (site.checks.notFound?.soft404) add("medium", "reliability", "Unknown URLs return 200 instead of 404", "A made-up address answered 200, so broken links look fine to search engines and monitors.", "Return a real 404 status (with a friendly page) for unknown routes.");
