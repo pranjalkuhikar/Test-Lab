@@ -5,6 +5,7 @@ import { integrationFile, HTTP_HELPER } from "./integration.js";
 import { contractFiles, probeApp, SCHEMA_HELPER } from "./contract.js";
 import { e2eFiles, PLAYWRIGHT_CONFIG } from "./e2e.js";
 import { slug } from "./util.js";
+import { aiEnhance } from "../ai/enhance.js";
 
 const svcName = (model, dir) => model.services.find((s) => (s.dir === "." ? "" : s.dir) === (dir || ""))?.name || model.name;
 
@@ -13,6 +14,7 @@ export async function generateTests(model, opts = {}) {
   const fl = opts.flavor === "vitest" ? "vitest" : "node";
   const baseUrl = (opts.baseUrl || "").trim();
   const files = [], skipped = [], notes = [];
+  const testedUnits = [];
   const log = opts.onProgress || (() => {});
 
   // ---------------------------------------------------------------- unit
@@ -46,7 +48,8 @@ export async function generateTests(model, opts = {}) {
         const dropped = rec.results.length - stable.length;
         if (dropped) notes.push(`${u.name}(): ${dropped} input${dropped === 1 ? "" : "s"} gave different results on repeated runs (time/randomness) and were left out`);
         if (!stable.length) { skipped.push({ layer: "unit", what: `${u.name}() · ${u.file}`, reason: "no repeatable results" }); continue; }
-        (byFile.get(u.file) || byFile.set(u.file, []).get(u.file)).push({ unit: u, results: stable.slice(0, 40) });
+        testedUnits.push(u.id);
+        (byFile.get(u.file) || byFile.set(u.file, []).get(u.file)).push({ unit: u, results: stable.slice(0, 90) });
       }
     };
     await Promise.all([worker(), worker(), worker()]);
@@ -106,8 +109,16 @@ export async function generateTests(model, opts = {}) {
     for (const p of model.pages.filter((x) => x.dynamic)) skipped.push({ layer: "e2e", what: `page ${p.path}`, reason: "dynamic route: needs a real record ID, add by hand" });
   }
 
+  // ---------------------------------------------------------------- AI review (optional): proposes, then everything is verified by execution
+  let ai = null;
+  if (opts.ai?.enabled) {
+    ai = await aiEnhance(model, { testedUnits, flavor: fl }, { ...opts.ai, onProgress: log });
+    for (const f of ai.files) files.push(f);
+    skipped.push(...ai.skipped); notes.push(...ai.notes);
+  }
+
   // ---------------------------------------------------------------- shared helpers + README
-  const needsHttp = files.some((f) => ["integration", "contract", "pact"].includes(f.layer));
+  const needsHttp = files.some((f) => ["integration", "contract", "pact"].includes(f.layer) || (f.layer === "ai" && f.path.startsWith("integration/")));
   if (needsHttp) files.push({ path: "helpers/http.mjs", layer: "support", support: true, tests: 0, content: HTTP_HELPER.replace("__BASE_URL__", baseUrl || "http://localhost:3000").replace("__EXPECT_AUTH__", String(expectAuth)) });
   if (files.some((f) => f.layer === "contract" || f.layer === "pact")) files.push({ path: "helpers/schema.mjs", layer: "support", support: true, tests: 0, content: SCHEMA_HELPER });
   const cmd = fl === "vitest"
@@ -122,6 +133,7 @@ Created by **TestLab** for \`${model.name}\`. Put this folder at \`<project>/tes
 | \`unit/\` | Characterization tests: each function was run with edge inputs in a sandbox and its real result is pinned | \`${cmd.unit}\` |
 | \`integration/\` | Real HTTP requests per endpoint: lifecycles, bad IDs, validation, security, auth | \`${cmd.api}\` |
 | \`contract/\` | Response-shape tests + Pact files (\`pacts/*.json\`) and a verifier that replays them | same as above |
+| \`*.ai.test.mjs\` | **AI-assisted** (only if AI review was on): extra inputs recorded from the real code, plus \`[AI finding]\` tests that FAIL until a suspected bug is fixed. See \`AI-FINDINGS.md\` | same commands |
 | \`e2e/\` | Playwright browser tests (needs \`npm i -D @playwright/test\`) | \`BASE_URL=http://localhost:3000 npx playwright test --config tests-generated/e2e/playwright.config.mjs\` |
 
 ## Please read
@@ -133,5 +145,5 @@ Created by **TestLab** for \`${model.name}\`. Put this folder at \`<project>/tes
 
   const byLayer = {};
   for (const f of files) if (!f.support && !f.data) byLayer[f.layer] = (byLayer[f.layer] || 0) + (f.tests || 0);
-  return { files, skipped, notes, summary: { files: files.filter((f) => !f.support && !f.data).length, tests: Object.values(byLayer).reduce((a, b) => a + b, 0), byLayer, reachable, expectAuth }, probes: probes ? [...probes.values()].map((p) => ({ path: p.route.path, service: p.route.service, status: p.status, skipped: p.skipped, error: p.error })) : null };
+  return { ai: ai ? { model: ai.model, cost: ai.cost, usage: ai.usage, findings: ai.findings, refuted: ai.refuted, units: ai.units, routes: ai.routes, error: ai.error } : null, testedUnits, files, skipped, notes, summary: { files: files.filter((f) => !f.support && !f.data).length, tests: Object.values(byLayer).reduce((a, b) => a + b, 0), byLayer, reachable, expectAuth }, probes: probes ? [...probes.values()].map((p) => ({ path: p.route.path, service: p.route.service, status: p.status, skipped: p.skipped, error: p.error })) : null };
 }
