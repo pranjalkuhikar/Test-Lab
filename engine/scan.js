@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { parseSource, walk, isFn, text, chain, calleeName, strValue, measure, freeVars, paramFields } from "./ast.js";
+import { parseSource, walk, isFn, text, chain, calleeName, strValue, measure, freeVars, paramFields, constantsOf } from "./ast.js";
 import { walkFiles } from "./walkfiles.js";
 
 const HTTP = new Set(["get", "post", "put", "patch", "delete", "head", "options", "all"]);
@@ -218,12 +218,12 @@ function analyzeFile(file, code, service) {
         const alias = consts.get(name)?.init; // export const PUT = update;
         if (!f && alias?.type === "Identifier") f = info.localFns.get(alias.name);
         const h = f ? analyzeHandler(code, f.node, info.localFns) : analyzeHandler(code, null, info.localFns);
-        info.routes.push({ method: name, path: p, file: rel, line: f?.node.loc.start.line || 1, source: "next-app", owner: null, ...handlerInfo(h), handlerFound: !!f });
+        info.routes.push({ method: name, path: p, file: rel, line: f?.node.loc.start.line || 1, source: "next-app", owner: null, ...handlerInfo(h), handlerFound: !!f, code: f ? code.slice(f.node.start, f.node.end).slice(0, 4500) : null });
       }
     } else {
       const f = info.localFns.get("default");
       const h = analyzeHandler(code, f?.node, info.localFns);
-      info.routes.push({ method: "ALL", path: p, file: rel, line: f?.node.loc.start.line || 1, source: "next-pages", owner: null, ...handlerInfo(h), handlerFound: !!f });
+      info.routes.push({ method: "ALL", path: p, file: rel, line: f?.node.loc.start.line || 1, source: "next-pages", owner: null, ...handlerInfo(h), handlerFound: !!f, code: f ? code.slice(f.node.start, f.node.end).slice(0, 4500) : null });
     }
   }
 
@@ -247,7 +247,7 @@ function analyzeFile(file, code, service) {
         else if (last.type === "Identifier") { if (consts.has(last.name)) return; /* a middleware such as rateLimit(...), not a handler */ hn = info.localFns.get(last.name)?.node || null; }
         const h = analyzeHandler(code, hn, info.localFns);
         for (const mid of handlers.slice(0, -1)) if (mid.type === "Identifier" && AUTH_RE.test(mid.name)) h.auth = true; // e.g. app.get("/me", requireUser, handler)
-        for (const pth of paths) info.routes.push({ method: prop.toUpperCase(), path: pth, file: rel, line: n.loc.start.line, source: "express", owner: n.callee.object.name, ...handlerInfo(h), handlerFound: !!hn });
+        for (const pth of paths) info.routes.push({ method: prop.toUpperCase(), path: pth, file: rel, line: n.loc.start.line, source: "express", owner: n.callee.object.name, ...handlerInfo(h), handlerFound: !!hn, code: hn ? code.slice(hn.start, hn.end).slice(0, 4500) : null });
       }
     }
     if (prop === "use" && n.arguments.length >= 2 && strValue(n.arguments[0])?.startsWith("/")) {
@@ -333,11 +333,13 @@ function analyzeFile(file, code, service) {
     const ex = isTs ? { ok: false, reason: "TypeScript source (needs a compiler)" } : f.node.generator ? { ok: false, reason: "generator function" } : extract(name);
     info.fnFields = info.fnFields || {};
     info.fnFields[name] = paramFields(f.node);
+    info.fnSources = info.fnSources || {};
+    if (src.length < 3500) info.fnSources[name] = src;
     info.units.push({
       id: `${rel}#${name}`, name, file: rel, line: f.node.loc.start.line, endLine: f.node.loc.end.line, loc: f.node.loc.end.line - f.node.loc.start.line + 1,
       exported: info.exports.has(name), async: !!f.node.async, params, complexity: m.complexity, conditions: m.conditions, throws: m.throws, service,
       nondeterministic: /\b(Math\.random|Date\.now|new Date\(|randomUUID)/.test(src),
-      extractable: ex.ok, extractSource: ex.ok ? ex.source : null, skipReason: ex.ok ? null : ex.reason, fields: paramFields(f.node),
+      extractable: ex.ok, extractSource: ex.ok ? ex.source : null, skipReason: ex.ok ? null : ex.reason, fields: paramFields(f.node), constants: constantsOf(f.node),
     });
   }
   return info;
@@ -424,6 +426,8 @@ export function scanProject(dirInput) {
       const src = i.bindings.get(c); const target = src ? resolve(r.file, src) : null;
       const fields = target ? infos.get(target).fnFields?.[c] : null;
       if (fields && ["POST", "PUT", "PATCH"].includes(r.method)) for (const f of fields) if (!r.bodyFields.includes(f)) r.bodyFields.push(f);
+      const helper = target ? infos.get(target).fnSources?.[c] : null; // the validator the handler calls, shown to the AI reviewer
+      if (helper && (r.helpers || []).length < 3) (r.helpers ||= []).push({ name: c, file: target, code: helper });
     }
   }
   for (const i of infos.values()) for (const u of i.units) {
